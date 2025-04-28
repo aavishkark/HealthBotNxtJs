@@ -1,37 +1,66 @@
 'use client';
 
-import { useChat } from '@ai-sdk/react';
+import { useState } from 'react';
 
-export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
+export default function Home() {
+  const [input, setInput] = useState('');
+  const [response, setResponse] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setResponse('');
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: input }),
+      });
+
+      const data = await res.json();
+      setResponse(data.reply || 'No response.');
+      console.log(data.reply);
+    } catch (err) {
+      console.error(err);
+      setResponse('Error fetching data.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col w-full max-w-md py-24 mx-auto stretch">
-      {messages.map(message => (
-        <div key={message.id} className="whitespace-pre-wrap">
-          {message.role === 'user' ? 'User: ' : 'AI: '}
-          {message.parts.map((part, i) => {
-            switch (part.type) {
-              case 'text':
-                return <div key={`${message.id}-${i}`}>{part.text}</div>;
-              case 'tool-invocation':
-                return (
-                  <pre key={`${message.id}-${i}`}>
-                    {JSON.stringify(part.toolInvocation, null, 2)}
-                  </pre>
-                );
-            }
-          })}
-        </div>
-      ))}
+    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      <h1 className="text-2xl font-bold mb-6">🍎 Calorie Bot</h1>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="w-full max-w-md flex flex-col gap-4">
         <input
-          className="fixed dark:bg-zinc-900 bottom-0 w-full max-w-md p-2 mb-8 border border-zinc-300 dark:border-zinc-800 rounded shadow-xl"
+          className="border rounded p-2 w-full"
+          type="text"
           value={input}
-          placeholder="Say something..."
-          onChange={handleInputChange}
+          placeholder="e.g., How many calories in a banana?"
+          onChange={(e) => setInput(e.target.value)}
+          required
         />
+        <button
+          type="submit"
+          className="bg-blue-500 text-white rounded p-2 hover:bg-blue-600 transition"
+          disabled={loading}
+        >
+          {loading ? 'Thinking...' : 'Ask'}
+        </button>
       </form>
+
+      <div className="mt-6 w-full max-w-md">
+        {response && (
+          <div className="border rounded p-4">
+            <strong>Bot:</strong> {response}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

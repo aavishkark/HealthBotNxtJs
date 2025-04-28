@@ -1,45 +1,30 @@
-import { openai } from '@ai-sdk/openai';
-import { streamText, tool } from 'ai';
-import { z } from 'zod';
-
-export const maxDuration = 30;
+import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  try {
+    const { query } = await req.json();
 
-  const result = streamText({
-    model: openai('gpt-4o'),
-    messages,
-    tools: {
-      weather: tool({
-        description: 'Get the weather in a location (fahrenheit)',
-        parameters: z.object({
-          location: z.string().describe('The location to get the weather for'),
-        }),
-        execute: async ({ location }) => {
-          const temperature = Math.round(Math.random() * (90 - 32) + 32);
-          return {
-            location,
-            temperature,
-          };
-        },
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama3-70b-8192',
+        messages: [
+          { role: 'system', content: 'You are a helpful nutrition assistant. Only answer questions related to calories and your response will only have calories and nothing else. If User specify specific amount then make your response according to it or if user does not specify consider 100gm as default' },
+          { role: 'user', content: query },
+        ],
       }),
-      convertFahrenheitToCelsius: tool({
-        description: 'Convert a temperature in fahrenheit to celsius',
-        parameters: z.object({
-          temperature: z
-            .number()
-            .describe('The temperature in fahrenheit to convert'),
-        }),
-        execute: async ({ temperature }) => {
-          const celsius = Math.round((temperature - 32) * (5 / 9));
-          return {
-            celsius,
-          };
-        },
-      }),
-    },
-  });
+    });
 
-  return result.toDataStreamResponse();
+    const data = await response.json();
+    const answer = data.choices[0].message.content;
+    return NextResponse.json({ reply: answer });
+
+  } catch (error: any) {
+    console.error('Groq API Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
